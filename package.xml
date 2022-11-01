@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>insole</name>
+  <name>insole_hear</name>
   <version>0.0.0</version>
   <description>The insole package</description>
   <maintainer email="harco@todo.todo">harco</maintainer>

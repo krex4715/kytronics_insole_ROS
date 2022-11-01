@@ -5,15 +5,13 @@ import numpy as np
 
 from std_msgs.msg import Float64MultiArray
 from socket import *
-import struct
+import os
 
 
 
-TCP_IP = "192.168.50.51"
-TCP_PORT = 2000
 
 class KLib():
-    def __init__(self,_server_ip = "192.168.50.96", _port = 3800):
+    def __init__(self,_server_ip = "127.0.0.1", _port = 3800):
         self.nrow = 0
         self.ncol = 0
         self.datasize = 0
@@ -25,14 +23,14 @@ class KLib():
         self.adc = []
         
         self.buf = None
-        self.BufSize = 200
+        self.BufSize = 5000
         self.addr = None
         self.client_socket = None
         self.result = None
 
         self.client_socket_connection = False
-
-
+        self.pubarray = np.zeros((16,20))
+        
         self.pub_insole = rospy.Publisher('insole_data', Float64MultiArray, queue_size=10)
 
     #TcpIP 연결 시도
@@ -90,7 +88,8 @@ class KLib():
         # rawdata array 생성
         for i in range(96,self.datasize+96):
             self.adc.append(int(self.buf[i]))
-               
+            
+        
 
     def check_tcp_connection(self):
         if(self.client_socket_connection == True):
@@ -107,7 +106,7 @@ class KLib():
 
     #패킷읽기
     def read(self):
-        self.buf  = self.client_socket.recv(self.BufSize)
+        self.buf  = self.buf + self.client_socket.recv(self.BufSize)
 
         #header가 2개 이상이 아닌경우 패킷이 다안들어왔을 가능성이 있음
         while(1):
@@ -124,15 +123,27 @@ class KLib():
                 break
 
         for i in range(96+sp,self.datasize+96+sp):
-             self.adc[i-96-sp] = float(self.buf[i])
+             self.adc[i-96-sp] = int(self.buf[i])
 
+        # 읽어들인 adc 데이터 부분 삭제
+        self.buf = self.buf[self.datasize+96+sp:]
+        
+    def printadc(self):
+        # pubarray = []
+        # for i in range(self.nrow):
+        #     write_float = []
+        #     for j in range(self.ncol):
+        #         write_float.append(float(self.adc[i*self.ncol + j]))
+            
+        #     pubarray.append(write_float)
+        self.pubarray = np.array(self.adc) 
+        print()
+        
+        
     def publish_insole(self):
         insole_array = Float64MultiArray()
-        
-
-
-        insole_array.data = self.adc
-        print(np.array(self.adc).reshape(16,20))
+        insole_array.data = self.pubarray.tolist()
+        print(insole_array)
 
         self.pub_insole.publish(insole_array)
 
@@ -142,12 +153,13 @@ class KLib():
 def main():
     rospy.init_node('insole', anonymous=True)
     rate = rospy.Rate(10000)
-    klib = KLib("192.168.50.96", 3800)
+    klib = KLib("192.168.50.53", 3800)
     klib.start()
     rospy.loginfo("insole node active")
 
     while not rospy.is_shutdown():
         klib.read()
+        klib.printadc()
         klib.publish_insole()
         rate.sleep()
 
